@@ -345,13 +345,20 @@ bool exists_archivo (const char* name) {
   return (stat (name, &buffer) == 0); 
 }
 
-
 void cd(char** argv){
 	chdir(argv[1]);
 }
 
 void makedir(char** argv){
-	mkdir(argv[1], S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+	if (argv[1]){
+		if (exists_archivo(argv[1])){
+			cout<<"Ya existe un archivo con ese nombre"<<endl;
+		}else{
+			mkdir(argv[1], S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+		}
+	}else{
+		cout<<"Aun falta operandos"<<endl;
+	}
 }
 
 void chmod(char** argv){
@@ -365,34 +372,59 @@ void chmod(char** argv){
     }else{
     	cout<<"Permisos equivocado"<<endl;
     }
-	/*4 read (r)
+	/*owner/group/others
+	4 read (r)
 	2 write (w)
 	1 execute (x)
-	owner/group/others*/
+	*/
 }
 
-void rmdir_R (const char* directory_name) {
-    DIR* dp= opendir(directory_name);
-    struct dirent*  ep;
-    char  p_buf[512] = {0};
-
-    while ((ep = readdir(dp)) != NULL) {
-        sprintf(p_buf, "%s/%s", directory_name, ep->d_name);
-        if (exists_archivo(p_buf))
-            rmdir_R(p_buf);
-        else
-            unlink(p_buf);
-    }
-
-    closedir(dp);
-    rmdir(directory_name);
+int rmdir_R(const char *path){
+   	DIR* directorio = opendir(path);
+   	size_t path_len = strlen(path);
+   	int r = -1;
+   	if (directorio){
+      	struct dirent *p;
+      	r = 0;
+      	while (!r && (p=readdir(directorio))){
+          	int r2 = -1;
+          	char *buf;
+          	size_t len;
+          	if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, "..")){
+             	continue;
+          	}
+          	len = path_len + strlen(p->d_name) + 2; 
+          	buf = (char*)malloc(len);
+          	if (buf){
+             	struct stat statbuf;
+             	snprintf(buf, len, "%s/%s", path, p->d_name);
+	            if (!stat(buf, &statbuf)){
+	                if (S_ISDIR(statbuf.st_mode)){
+	                   	r2 = rmdir_R(buf);
+	                }else{
+	                   	r2 = unlink(buf);
+	                }
+	            }
+	            free(buf);
+	        }
+          	r = r2;
+      	}
+   	   	closedir(directorio);
+   	}
+   	if (!r){
+      	r = rmdir(path);
+   	}
+   	return r;
 }
 
 void rmdir(char** argv){
 	if (argv[1]){
-		cout<<argv[1]<<endl;
 		if (strcmp(argv[1], "-R")==0){
-			rmdir_R(argv[2]);
+			if (exists_archivo(argv[2])){
+				rmdir_R(argv[2]);
+			}else{
+				cout<<"No existe tal directorio."<<endl;
+			}
 		}else{
 			if (exists_archivo(argv[1])){
 				std::ifstream file(argv[1]);
