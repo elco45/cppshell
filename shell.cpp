@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <fstream>
 #include <dirent.h>
+#include <pwd.h>
 
 using namespace std;
 
@@ -346,7 +347,19 @@ bool exists_archivo (const char* name) {
 }
 
 void cd(char** argv){
-	chdir(argv[1]);
+	struct stat s;
+	if( stat(argv[1],&s) == 0 ){
+	    if( s.st_mode & S_IFDIR ){ //directorio
+	        chdir(argv[1]);
+	    }else if( s.st_mode & S_IFREG ){//archivo
+	        cout<<"No es un archivo"<<endl;
+	    }
+	}else{
+		struct passwd *pw = getpwuid(getuid());
+		const char* homedir = pw->pw_dir;
+	    chdir(homedir);
+	}
+	
 }
 
 void makedir(char** argv){
