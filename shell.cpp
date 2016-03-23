@@ -12,6 +12,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <fstream>
+#include <dirent.h>
 
 using namespace std;
 
@@ -24,8 +25,7 @@ struct command{
 void *xmalloc (int size){
     void *buf;
     buf = malloc (size);
-    if (!buf)
-    {
+    if (!buf){
         fprintf (stderr, "Error: Out of memory. Exiting.\n");
         exit (1);
     }
@@ -340,6 +340,11 @@ void redirectionErrorToOutput(char** argv){
 	close(pipeForStdErr[0]);  
 }
 
+bool exists_archivo (const char* name) {
+  struct stat buffer;   
+  return (stat (name, &buffer) == 0); 
+}
+
 
 void cd(char** argv){
 	chdir(argv[1]);
@@ -349,6 +354,62 @@ void makedir(char** argv){
 	mkdir(argv[1], S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 }
 
+void chmod(char** argv){
+    int permisos=strtol(argv[1], 0, 8);
+    if (permisos){
+    	if (exists_archivo(argv[2])){
+    		chmod(argv[2],permisos);
+    	}else{
+    		cout<<"No existe tal archivo."<<endl;
+    	}
+    }else{
+    	cout<<"Permisos equivocado"<<endl;
+    }
+	/*4 read (r)
+	2 write (w)
+	1 execute (x)
+	owner/group/others*/
+}
+
+void rmdir_R (const char* directory_name) {
+    DIR* dp= opendir(directory_name);
+    struct dirent*  ep;
+    char  p_buf[512] = {0};
+
+    while ((ep = readdir(dp)) != NULL) {
+        sprintf(p_buf, "%s/%s", directory_name, ep->d_name);
+        if (exists_archivo(p_buf))
+            rmdir_R(p_buf);
+        else
+            unlink(p_buf);
+    }
+
+    closedir(dp);
+    rmdir(directory_name);
+}
+
+void rmdir(char** argv){
+	if (argv[1]){
+		cout<<argv[1]<<endl;
+		if (strcmp(argv[1], "-R")==0){
+			rmdir_R(argv[2]);
+		}else{
+			if (exists_archivo(argv[1])){
+				std::ifstream file(argv[1]);
+				file.seekg(0, ios::end); 
+				if (file.tellg()!=0){
+					rmdir(argv[1]);
+				}else{
+					cout<<"El directorio no esta vacio."<<endl;
+				}
+			}else{
+				cout<<"No existe tal directorio."<<endl;
+			}
+		}
+	}else{
+		cout<<"Falta ingresar el directorio."<<endl;
+	}
+}
 
 void ejecutar(char **argv){
     pid_t  pid;
@@ -483,6 +544,10 @@ int main (){
 			cd(argv);
 		}else if (strcmp(argv[0], "mkdir") == 0){
 			makedir(argv);
+		}else if (strcmp(argv[0], "chmod") == 0){
+			chmod(argv);
+		}else if (strcmp(argv[0], "rmdir") == 0){
+			rmdir(argv);
 		}else{
 			signal(SIGINT, SIG_IGN);       	        //The instructions said to ignore the SIGINT signal
 		    signal(SIGTERM, SIG_DFL);               //SIGTERM signal must be caught.
